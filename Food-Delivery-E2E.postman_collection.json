@@ -1,0 +1,334 @@
+{
+  "info": {
+    "name": "Food Delivery \u2014 E2E Collection",
+    "_postman_id": "8225ea8f-4603-4e4c-91ef-830e6d80c816",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Sequential tests for Orders, Catalog (ETag/304), and Logistics (info). Uses environment variables."
+  },
+  "item": [
+    {
+      "name": "00 - Health",
+      "item": [
+        {
+          "name": "Gateway Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_gateway}}/actuator/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);",
+                  "pm.test('UP', () => pm.response.json().status === 'UP');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Order Service Health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_order}}/actuator/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);",
+                  "pm.test('UP', () => pm.response.json().status === 'UP');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Catalog Service Health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_catalog}}/actuator/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);",
+                  "pm.test('UP', () => pm.response.json().status === 'UP');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logistics Service Health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_logistics}}/actuator/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);",
+                  "pm.test('UP', () => pm.response.json().status === 'UP');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Orders",
+      "item": [
+        {
+          "name": "Create Order (idempotent #1)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "function uuidv4(){return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0,v=c=='x'?r:(r&0x3|0x8);return v.toString(16);});}",
+                  "if(!pm.environment.get('idempotency_key')){ pm.environment.set('idempotency_key', uuidv4()); }"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 or 200', () => [200,201].includes(pm.response.code));",
+                  "const data = pm.response.json();",
+                  "pm.environment.set('order_id', data.orderId);",
+                  "pm.test('orderId present', () => !!data.orderId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotency_key}}"
+              }
+            ],
+            "url": "{{base_gateway}}/api/orders"
+          }
+        },
+        {
+          "name": "Create Order (idempotent #2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 or 200', () => [200,201].includes(pm.response.code));",
+                  "const data = pm.response.json();",
+                  "pm.test('same orderId', () => data.orderId === pm.environment.get('order_id'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotency_key}}"
+              }
+            ],
+            "url": "{{base_gateway}}/api/orders"
+          }
+        },
+        {
+          "name": "Get Order Status",
+          "request": {
+            "method": "GET",
+            "url": "{{base_order}}/orders/{{order_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.code === 200);",
+                  "const data = pm.response.json();",
+                  "pm.test('id matches', () => data.id === pm.environment.get('order_id'));",
+                  "pm.test('has status', () => ['CREATED','PAID','CANCELLED'].includes(data.status));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Catalog",
+      "item": [
+        {
+          "name": "Get Menu (initial)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_gateway}}/api/restaurants/{{restaurant_id}}/menu"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.code === 200);",
+                  "pm.test('ETag present', () => pm.response.headers.has('ETag'));",
+                  "pm.environment.set('menu_etag', pm.response.headers.get('ETag'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Menu If-None-Match (304)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "If-None-Match",
+                "value": "{{menu_etag}}"
+              }
+            ],
+            "url": "{{base_gateway}}/api/restaurants/{{restaurant_id}}/menu"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('304', () => pm.response.code === 304);",
+                  "pm.test('ETag matches', () => pm.response.headers.get('ETag') === pm.environment.get('menu_etag'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Menu Cache",
+          "request": {
+            "method": "POST",
+            "url": "{{base_catalog}}/restaurants/{{restaurant_id}}/menu/_refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('202', () => pm.response.code === 202);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Menu After Refresh",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "If-None-Match",
+                "value": "{{menu_etag}}"
+              }
+            ],
+            "url": "{{base_gateway}}/api/restaurants/{{restaurant_id}}/menu"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.code === 200);",
+                  "pm.test('New ETag', () => pm.response.headers.get('ETag') && pm.response.headers.get('ETag') !== pm.environment.get('menu_etag'));",
+                  "pm.environment.set('menu_etag', pm.response.headers.get('ETag'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Logistics",
+      "item": [
+        {
+          "name": "WebSocket Info",
+          "request": {
+            "method": "GET",
+            "url": "{{base_logistics}}/ws-info"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.code === 200);",
+                  "const data = pm.response.json();",
+                  "pm.test('has endpoint', () => !!data.endpoint);",
+                  "pm.test('has topic', () => !!data.topic);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "99 - API Docs (JSON)",
+      "item": [
+        {
+          "name": "Gateway API Docs",
+          "request": {
+            "method": "GET",
+            "url": "{{base_gateway}}/v3/api-docs"
+          }
+        },
+        {
+          "name": "Order Service API Docs",
+          "request": {
+            "method": "GET",
+            "url": "{{base_order}}/v3/api-docs"
+          }
+        },
+        {
+          "name": "Catalog Service API Docs",
+          "request": {
+            "method": "GET",
+            "url": "{{base_catalog}}/v3/api-docs"
+          }
+        },
+        {
+          "name": "Logistics Service API Docs",
+          "request": {
+            "method": "GET",
+            "url": "{{base_logistics}}/v3/api-docs"
+          }
+        }
+      ]
+    }
+  ]
+}

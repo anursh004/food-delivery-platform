@@ -126,3 +126,13 @@ services:
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./grafana/dashboards:/var/lib/grafana/dashboards
     depends_on: [prometheus]
+
+  driver-simulator:
+    build: ./driver-simulator
+    depends_on: [kafka]
+    environment:
+      - app.kafka.bootstrap-servers=kafka:9092
+      - app.topic=driver.locations
+      - sim.drivers=50
+      - sim.periodMs=5000
+    profiles: ["sim"]

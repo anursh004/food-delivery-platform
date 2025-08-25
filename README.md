@@ -112,3 +112,20 @@ The dashboard shows:
 - **Cache hit rate** (if metrics present)
 
 > Spring Boot exposes metrics on `/actuator/prometheus`, already scraped by Prometheus. Panels that reference optional metrics will render when those appear.
+
+
+## Payment Mock (Resilience-friendly)
+- `PaymentMockWorker` runs asynchronously and marks newly created orders **PAID** without blocking order creation.
+- Confirms the design goal: unreliable payment does **not** impact core order-taking path.
+
+## Menu Performance (P99)
+- `MenuPerformanceIT` warms the cache and asserts P99 < 200ms for cached requests using ETag/304 path.
+
+## Driver Simulator (Local Load)
+- New module `driver-simulator` produces GPS updates for up to **50 drivers** every **5s** (≈10 events/sec total).
+- Start with compose profile:
+```bash
+mvn -q -pl driver-simulator -am -DskipTests=false package
+docker compose --profile sim up --build -d driver-simulator
+```
+- Configure via env: `sim.drivers`, `sim.periodMs`.

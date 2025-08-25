@@ -38,6 +38,7 @@
     <module>logistics-service</module>
     <module>api-gateway</module>
     <module>e2e-tests</module>
+      <module>driver-simulator</module>
   </modules>
 
   <build>
