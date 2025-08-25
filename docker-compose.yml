@@ -1,0 +1,114 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16
+    container_name: fd-postgres
+    environment:
+      POSTGRES_USER: food
+      POSTGRES_PASSWORD: foodpw
+      POSTGRES_DB: fooddb
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U food -d fooddb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7
+    container_name: fd-redis
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: fd-zookeeper
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports: ["2181:2181"]
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "echo ruok | nc -w 2 localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: fd-kafka
+    depends_on: [zookeeper]
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+    ports: ["9092:9092"]
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  order-service:
+    build: ./order-service
+    depends_on: [postgres, kafka]
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fooddb
+      - SPRING_DATASOURCE_USERNAME=food
+      - SPRING_DATASOURCE_PASSWORD=foodpw
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    ports: ["8082:8082"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  catalog-service:
+    build: ./catalog-service
+    depends_on: [postgres, redis]
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fooddb
+      - SPRING_DATASOURCE_USERNAME=food
+      - SPRING_DATASOURCE_PASSWORD=foodpw
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+    ports: ["8083:8083"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  logistics-service:
+    build: ./logistics-service
+    depends_on: [postgres, kafka]
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fooddb
+      - SPRING_DATASOURCE_USERNAME=food
+      - SPRING_DATASOURCE_PASSWORD=foodpw
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    ports: ["8084:8084"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api-gateway:
+    build: ./api-gateway
+    depends_on: [order-service, catalog-service, logistics-service]
+    ports: ["8080:8080"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: fd-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports: ["9090:9090"]
