@@ -11,7 +11,10 @@ spring:
     hibernate:
       ddl-auto: validate
   kafka:
-    bootstrap-servers: kafka:9092
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 management:
   endpoints:
     web:
@@ -20,3 +23,6 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+app:
+  kafka:
+    ordersCreatedTopic: orders.created

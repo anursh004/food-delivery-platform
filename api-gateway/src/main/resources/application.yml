@@ -8,3 +8,10 @@ management:
     web:
       exposure:
         include: health,info,prometheus
+services:
+  order:
+    baseUri: ${ORDER_SERVICE_BASE:http://order-service:8082}
+  catalog:
+    baseUri: ${CATALOG_SERVICE_BASE:http://catalog-service:8083}
+  logistics:
+    baseUri: ${LOGISTICS_SERVICE_BASE:http://logistics-service:8084}
