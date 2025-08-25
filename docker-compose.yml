@@ -51,7 +51,9 @@ services:
       retries: 10
 
   order-service:
-    build: ./order-service
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
     depends_on: [postgres, kafka]
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fooddb
@@ -66,7 +68,9 @@ services:
       retries: 10
 
   catalog-service:
-    build: ./catalog-service
+    build:
+      context: .
+      dockerfile: catalog-service/Dockerfile
     depends_on: [postgres, redis]
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fooddb
@@ -82,7 +86,9 @@ services:
       retries: 10
 
   logistics-service:
-    build: ./logistics-service
+    build:
+      context: .
+      dockerfile: logistics-service/Dockerfile
     depends_on: [postgres, kafka]
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fooddb
@@ -97,7 +103,9 @@ services:
       retries: 10
 
   api-gateway:
-    build: ./api-gateway
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
     depends_on: [order-service, catalog-service, logistics-service]
     ports: ["8080:8080"]
     healthcheck:
@@ -128,7 +136,9 @@ services:
     depends_on: [prometheus]
 
   driver-simulator:
-    build: ./driver-simulator
+    build:
+      context: .
+      dockerfile: driver-simulator/Dockerfile
     depends_on: [kafka]
     environment:
       - app.kafka.bootstrap-servers=kafka:9092
