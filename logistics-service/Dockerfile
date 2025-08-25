@@ -2,7 +2,7 @@ FROM maven:3.9.5-eclipse-temurin-21 AS build
 WORKDIR /workspace
 COPY pom.xml .
 COPY logistics-service/pom.xml logistics-service/
-COPY common-domain/common-domain.pom.xml common-domain/
+COPY common-domain/pom.xml common-domain/
 COPY logistics-service/src logistics-service/src
 RUN mvn -f logistics-service/pom.xml -B -Dmaven.test.skip=true package -DskipTests
 
